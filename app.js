@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const E = window.Engine;
-  const VERSION = '1.1.0';
+  const VERSION = '1.2.0';
   const $app = document.getElementById('app');
 
   let S = E.emptyState();            // synced data: settings, days, deleted, adjustments
@@ -171,6 +171,12 @@
   }
   function banners(today) {
     const out = [];
+    if (!Object.keys(S.days).length && !S.adjustments.some((a) => !a.deleted)) {
+      out.push(el('div', { class: 'banner warn' },
+        el('span', {}, el('b', {}, 'Nothing stored on this device yet'),
+          el('small', { style: 'display:block' }, 'Data is kept per browser. If you expected your history, you may be in a private window, another browser or another profile. Open the app where you used it before, or import a backup file.')),
+        el('button', { class: 'btn small', onclick: () => go({ tab: 'more', more: 'sync' }) }, 'Import')));
+    }
     const pending = E.pendingDays(S, today);
     if (pending.length) {
       out.push(el('div', { class: 'banner warn' }, el('span', {}, `${pending.length} day${pending.length > 1 ? 's' : ''} to confirm`),
@@ -414,7 +420,7 @@
   /* ---------- month view ---------- */
   function weekRow(w) {
     return el('div', { class: 'week-row', onclick: () => go({ tab: 'week', week: w.monday }) },
-      el('b', {}, range(w.monday, w.sunday)), dual(w.netMin, true),
+      el('b', {}, range(w.monday, w.sunday)), dual(w.legacy ? w.balanceMin : w.uzMin, true),
       el('div', { class: 'sub' }, el('span', {}, 'worked ' + E.hm(w.workedMin)),
         w.legacy ? el('span', {}, 'legacy week') : [el('span', {}, 'Überstunden ' + E.hm(w.usMin)), el('span', {}, 'Überzeit ' + E.hm(w.uzMin, true)), w.creditMin ? el('span', {}, 'holiday credit ' + E.hm(w.creditMin, true)) : null]));
   }
