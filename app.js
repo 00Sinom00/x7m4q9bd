@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const E = window.Engine;
-  const VERSION = '1.2.0';
+  const VERSION = '1.3.0';
   const $app = document.getElementById('app');
 
   let S = E.emptyState();            // synced data: settings, days, deleted, adjustments
@@ -491,38 +491,35 @@
 
   /* ---------- totals ---------- */
   function viewTotals(C, today) {
-    const t = C.totals, s = S.settings, out = [topbar(null, 'Totals', today), ...banners(today)];
-    const comp = el('div', { class: 'card' }, el('h3', {}, 'Compensation balance'),
+    const t = C.totals, s = S.settings, v = C.vacation, out = [topbar(null, 'Totals', today), ...banners(today)];
+    out.push(el('div', { class: 'card' }, el('h3', {}, 'Total time off'),
+      el('div', { class: 'big' }, C.totalOffDays.toFixed(2), el('small', {}, 'days')),
+      kvText('Vacation left', `${v.remaining} d`),
+      kvText('Compensation', daysStr(C.balanceMin, true))));
+    out.push(el('div', { class: 'card' }, el('h3', {}, 'Compensation balance'),
       el('div', { class: 'big ' + (C.balanceMin < 0 ? 'neg' : 'pos') }, E.hm(C.balanceMin), el('small', {}, E.dec(C.balanceMin) + ' h · ' + daysStr(C.balanceMin))),
       el('p', { class: 'muted', style: 'margin:4px 0 8px' }, 'Time you can take off or have paid out.'),
       kv('Legacy weeks', t.legacyMin, { sub: s.cutoff ? `weeks starting before ${s.cutoff}` : 'none', signed: true }),
       kv('Überzeit', t.uzMin, { sub: 'weekly net above the allowance', signed: true }),
       kv('Holiday credit', t.creditMin, { sub: 'surplus on public holidays', signed: true }),
-      kv('Adjustments', t.adjMin, { signed: true }),
-      kv('Balance', C.balanceMin, { signed: true, strong: true, days: true }));
-    out.push(comp);
-    const wk = C.weeks[E.weekStart(today)];
-    out.push(el('div', { class: 'card' }, el('h3', {}, 'Überstunden (tracking only)'),
-      kv('Total since cutoff', t.usMin, { sub: 'covered by contract, never paid' }),
-      kv('This week', wk ? wk.usMin : 0, { sub: `allowance ${E.hm(s.freeAllowanceMin)} per week` })));
-    const v = C.vacation;
+      kv('Adjustments', t.adjMin, { signed: true })));
     out.push(el('div', { class: 'card' }, el('h3', {}, 'Vacation ' + v.year),
       el('div', { class: 'big' }, `${v.remaining}`, el('small', {}, 'days left')),
       kvText('Entitlement this year', `${v.perYear} d`),
       kvText('Carried in', `${v.carryIn} d`),
       kvText('Taken this year', `${v.takenYear} d`)));
-    out.push(el('div', { class: 'card' }, el('h3', {}, 'Total time off'),
-      el('div', { class: 'big' }, C.totalOffDays.toFixed(2), el('small', {}, 'days')),
-      kvText('Vacation left', `${v.remaining} d`),
-      kvText('Compensation', daysStr(C.balanceMin, true))));
     const y = +today.slice(0, 4), yr = C.years[y], legal = yr ? yr.legalUzMin : 0;
     const bar = (min, cap) => el('div', { class: 'bar' + (min > cap ? ' over' : '') }, el('i', { style: `width:${Math.min(100, cap ? (min / cap) * 100 : 0)}%` }));
-    out.push(el('div', { class: 'card' }, el('h3', {}, `Legal Überzeit ${y} (ArG, info)`),
-      el('p', { class: 'muted', style: 'margin:0 0 6px' }, `Hours worked above ${E.hm(s.legalWeekMin)} per week. Can differ from your Überzeit above.`),
+    out.push(el('div', { class: 'card' }, el('h3', {}, `Legal Überzeit ${y} (as per Arbeitsgesetz, Swiss Federal Labour Act [SR 822.11])`),
+      el('p', { class: 'muted', style: 'margin:0 0 6px' }, `Hours worked above ${E.hm(s.legalWeekMin)} per week. Can differ from your Überzeit in the compensation balance.`),
       kv('Legal Überzeit this year', legal),
       el('small', {}, `Surcharge-free limit ${E.hm(s.legalFreeYearMin)} (${E.dec(s.legalFreeYearMin)} h)`), bar(legal, s.legalFreeYearMin),
       el('small', {}, `Yearly cap ${E.hm(s.legalCapYearMin)} (${E.dec(s.legalCapYearMin)} h)`), bar(legal, s.legalCapYearMin),
       kv('Überzeit by your rule, this year', yr ? yr.uzMin : 0, { signed: true })));
+    const wk = C.weeks[E.weekStart(today)];
+    out.push(el('div', { class: 'card' }, el('h3', {}, 'Überstunden (tracking only)'),
+      kv('Total since cutoff', t.usMin, { sub: 'covered by contract, never paid' }),
+      kv('This week', wk ? wk.usMin : 0, { sub: `allowance ${E.hm(s.freeAllowanceMin)} per week` })));
     return out;
   }
 
