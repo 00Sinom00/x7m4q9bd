@@ -67,6 +67,7 @@
     holiday: { label: 'Public holiday' },
     halfholiday: { label: 'Half public holiday' },
     comp: { label: 'Compensation day' },
+    halfcomp: { label: 'Half compensation day' },
     vacation: { label: 'Vacation' },
     halfvacation: { label: 'Half vacation' },
     sick: { label: 'Sick' },
@@ -168,6 +169,8 @@
       default: return base; // work, comp
     }
   };
+  // Hours of this day taken as time in lieu: they use up the week's Ueberstunden first, then Ueberzeit.
+  E.timeOffMin = (rec, nominal) => (rec.type === 'comp' ? nominal : rec.type === 'halfcomp' ? Math.round(nominal / 2) : 0);
   // Virtual day pre-filled from the schedule (not stored, never counted).
   E.plannedDay = (settings, date) => {
     const sch = settings.schedule[E.dow(date)];
@@ -209,7 +212,7 @@
     const weeks = {};
     const getWeek = (mon) => weeks[mon] || (weeks[mon] = {
       monday: mon, sunday: E.addDays(mon, 6), legacy: !!(cutoff && mon < cutoff),
-      workedMin: 0, nominalMin: 0, netMin: 0, creditMin: 0, usMin: 0, uzMin: 0, balanceMin: 0, legalUzMin: 0, days: 0,
+      workedMin: 0, nominalMin: 0, netMin: 0, workNetMin: 0, timeOffMin: 0, creditMin: 0, usMin: 0, uzMin: 0, balanceMin: 0, legalUzMin: 0, days: 0,
     });
     const vacTaken = {}, compDays = {};
     for (const date of Object.keys(state.days).sort()) {
@@ -218,11 +221,16 @@
       const w = getWeek(E.weekStart(date));
       const worked = E.dayMin(rec), nom = E.nominalFor(s, date, rec), diff = worked - nom;
       w.workedMin += worked; w.nominalMin += nom; w.days++;
-      if (E.isHolidayType(rec.type) && diff > 0) w.creditMin += diff; else w.netMin += diff;
+      if (E.isHolidayType(rec.type) && diff > 0) w.creditMin += diff;
+      else {
+        const off = E.timeOffMin(rec, nom);
+        w.netMin += diff; w.workNetMin += diff + off; w.timeOffMin += off;
+      }
       const y = +date.slice(0, 4);
       if (rec.type === 'vacation') vacTaken[y] = (vacTaken[y] || 0) + 1;
       if (rec.type === 'halfvacation') vacTaken[y] = (vacTaken[y] || 0) + 0.5;
       if (rec.type === 'comp') compDays[y] = (compDays[y] || 0) + 1;
+      if (rec.type === 'halfcomp') compDays[y] = (compDays[y] || 0) + 0.5;
     }
     const T = { legacyMin: 0, uzMin: 0, usMin: 0, creditMin: 0, adjMin: 0 };
     const months = {}, years = {};
@@ -232,8 +240,13 @@
       const w = weeks[mon];
       if (w.legacy) { w.balanceMin = w.netMin + w.creditMin; T.legacyMin += w.balanceMin; }
       else {
-        w.usMin = Math.min(Math.max(w.netMin, 0), allow);
-        w.uzMin = w.netMin >= allow ? w.netMin - allow : (w.netMin >= 0 ? 0 : w.netMin);
+        // Earned from the work itself, then time in lieu uses Ueberstunden first, the rest comes out of Ueberzeit.
+        const n0 = w.workNetMin, off = w.timeOffMin;
+        const usEarned = Math.min(Math.max(n0, 0), allow);
+        const uzEarned = n0 >= allow ? n0 - allow : (n0 >= 0 ? 0 : n0);
+        const usedUs = Math.min(off, usEarned);
+        w.usMin = usEarned - usedUs;
+        w.uzMin = uzEarned - (off - usedUs);
         w.balanceMin = w.uzMin + w.creditMin;
         T.uzMin += w.uzMin; T.usMin += w.usMin; T.creditMin += w.creditMin;
       }

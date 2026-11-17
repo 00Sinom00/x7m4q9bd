@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const E = window.Engine;
-  const VERSION = '1.0.0';
+  const VERSION = '1.1.0';
   const $app = document.getElementById('app');
 
   let S = E.emptyState();            // synced data: settings, days, deleted, adjustments
@@ -271,7 +271,7 @@
     }
     typeSel.addEventListener('change', () => {
       const ty = typeSel.value;
-      if (['work', 'half', 'halfholiday'].includes(ty) && !inI.value && !outI.value && sch && sch.in) {
+      if (['work', 'half', 'halfholiday', 'halfcomp'].includes(ty) && !inI.value && !outI.value && sch && sch.in) {
         inI.value = sch.in;
         if (ty === 'work') { outI.value = sch.out || ''; brRows.splice(0).forEach((r) => r.node.remove()); (sch.breaks || []).forEach((b) => addBreak(b[0], b[1])); }
         else { const i = E.parseTime(sch.in); outI.value = E.fmtTime((i + Math.round((sch.nominalMin || 0) / 2)) % 1440); }
@@ -397,6 +397,7 @@
     if (!w) sum.append(el('p', { class: 'muted' }, 'No confirmed days yet.'));
     else {
       sum.append(kv('Worked', w.workedMin), kv('Nominal', w.nominalMin), kv('Net', w.netMin, { signed: true, strong: true }));
+      if (w.timeOffMin) sum.append(kv('Time off in lieu', -w.timeOffMin, { sub: 'uses Überstunden first, then Überzeit', signed: true }));
       if (w.legacy) sum.append(kvText('Rule', 'legacy week: all of it goes to the balance', 'muted'));
       else {
         sum.append(kv('Überstunden', w.usMin, { sub: 'covered by contract', signed: true }), kv('Überzeit', w.uzMin, { sub: 'net above the weekly allowance', signed: true }));
@@ -421,7 +422,7 @@
     let vac = 0, comp = 0;
     for (const [d, r] of Object.entries(S.days)) {
       if (!r.confirmed || !d.startsWith(prefix)) continue;
-      if (r.type === 'vacation') vac += 1; else if (r.type === 'halfvacation') vac += 0.5; else if (r.type === 'comp') comp += 1;
+      if (r.type === 'vacation') vac += 1; else if (r.type === 'halfvacation') vac += 0.5; else if (r.type === 'comp') comp += 1; else if (r.type === 'halfcomp') comp += 0.5;
     }
     return { vac, comp };
   }
