@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const E = window.Engine;
-  const VERSION = '1.3.1';
+  const VERSION = '1.3.2';
   const $app = document.getElementById('app');
 
   let S = E.emptyState();            // synced data: settings, days, deleted, adjustments
@@ -693,17 +693,27 @@
     if (!prev) { toast('Nothing to undo'); return; }
     S = E.normalize(prev); persist(); render(); toast('Previous data restored');
   }
+  // Sharing files to other apps only exists on phones and tablets; on a laptop the browser has no share sheet.
+  function canShareFiles() {
+    try {
+      if (!navigator.share || !navigator.canShare) return false;
+      return ['application/json', 'text/plain'].some((type) => navigator.canShare({ files: [new File(['x'], 'a.json', { type })] }));
+    } catch (e) { return false; }
+  }
   function viewSync() {
     const n = Object.keys(S.days).length, ds = Object.keys(S.days).sort();
+    const share = canShareFiles();
     return [
       topbar(navBtn('‹', () => go({ more: null }), 'Back'), 'Backup & sync'),
       el('div', { class: 'card' }, el('h3', {}, 'Export'),
         kvText('Last export', META.lastExportAt ? localStamp(META.lastExportAt) : 'never', META.lastExportAt ? '' : 'warn'),
         kvText('File name', exportName()),
         el('div', { class: 'btns' },
-          el('button', { class: 'btn primary', onclick: () => doExport(true) }, 'Share / save file'),
-          el('button', { class: 'btn', onclick: () => doExport(false) }, 'Download')),
-        el('p', { class: 'muted' }, 'Send the file to yourself (Drive, Slack, email) and import it on the other device. The date in the name is the day you export.')),
+          share ? el('button', { class: 'btn primary', onclick: () => doExport(true) }, 'Share…') : null,
+          el('button', { class: share ? 'btn' : 'btn primary', onclick: () => doExport(false) }, share ? 'Download' : 'Download backup')),
+        el('p', { class: 'muted' }, share
+          ? 'Share opens your phone\'s share sheet (Drive, Slack, email). Download saves the file to the Downloads folder. The date in the name is the day you export.'
+          : 'This browser has no share sheet, so the file is saved to your Downloads folder. Send it to yourself (Drive, Slack, email) and import it on the other device. The date in the name is the day you export.')),
       el('div', { class: 'card' }, el('h3', {}, 'Import'),
         el('p', { class: 'muted' }, 'Merging keeps the newest edit of every day, so the order of syncs does not matter. A day you deleted stays deleted unless it was edited afterwards elsewhere.'),
         el('div', { class: 'btns' }, el('button', { class: 'btn primary', onclick: () => pickFile(false) }, 'Import and merge…'),
