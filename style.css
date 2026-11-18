@@ -103,7 +103,15 @@ input.bad { border-color: var(--neg); outline: 1px solid var(--neg); }
 .stepper { display: flex; align-items: center; gap: 4px; }
 .stepper input.time { flex: 0 0 60px; width: 60px; min-width: 0; height: 36px; min-height: 36px; padding: 0 2px; font-size: 15px; }
 .btn.step { flex: 0 0 auto; min-width: 36px; height: 36px; min-height: 36px; padding: 0 4px; font-size: 13px; }
-.brk { border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; margin-top: 8px; }
-.brk-line { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
-.brk-line > small { width: 34px; flex: 0 0 auto; }
+.brk { border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px 8px; margin: 8px auto 0; width: fit-content; max-width: 100%; }
+.brk-head { position: relative; display: flex; align-items: center; justify-content: center; min-height: 36px; }
+.brk-head button { position: absolute; right: 0; top: 0; }
+.brk-cols { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; }
+.brk-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+/* day editor: everything centred, typing in the wide text fields stays left-aligned */
+.de { text-align: center; }
+.de label.f > span { text-align: center; }
+.de .row { justify-content: center; }
+.de .stepper { justify-content: center; }
+.de label.f > input[type=text], .de label.f > select { text-align: left; }
 

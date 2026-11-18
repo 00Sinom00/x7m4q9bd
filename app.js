@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const E = window.Engine;
-  const VERSION = '1.3.3';
+  const VERSION = '1.3.4';
   const $app = document.getElementById('app');
 
   let S = E.emptyState();            // synced data: settings, days, deleted, adjustments
@@ -267,10 +267,11 @@
       const row = { s: timeInput(s), e: timeInput(e2) };
       const dflt = (i) => (sch && sch.breaks && sch.breaks[0] && sch.breaks[0][i]) || (i ? '12:30' : '12:00');
       row.node = el('div', { class: 'brk' },
-        el('div', { class: 'brk-line' }, el('small', { style: 'flex:1;width:auto' }, 'Break'),
+        el('div', { class: 'brk-head' }, el('small', {}, 'Break'),
           el('button', { class: 'icon', 'aria-label': 'Remove break', onclick: () => { row.node.remove(); brRows.splice(brRows.indexOf(row), 1); refresh(); } }, '×')),
-        el('div', { class: 'brk-line' }, el('small', {}, 'from'), timeStepper(row.s, () => dflt(0))),
-        el('div', { class: 'brk-line' }, el('small', {}, 'to'), timeStepper(row.e, () => row.s.value || dflt(1))));
+        el('div', { class: 'brk-cols' },
+          el('div', { class: 'brk-col' }, el('small', {}, 'from'), timeStepper(row.s, () => dflt(0))),
+          el('div', { class: 'brk-col' }, el('small', {}, 'to'), timeStepper(row.e, () => row.s.value || dflt(1)))));
       row.node.addEventListener('input', refresh);
       brRows.push(row); brBox.append(row.node);
     };
@@ -368,7 +369,7 @@
         return undefined;
       } });
     }
-    modal(`Day ${date}`, body, buttons);
+    modal(`Day ${date}`, el('div', { class: 'de' }, body), buttons);
   }
 
   /* ---------- week view ---------- */
