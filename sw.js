@@ -1,5 +1,5 @@
 /* Offline cache. Bump VERSION together with VERSION in app.js on every release. */
-const VERSION = '1.3.2';
+const VERSION = '1.3.3';
 const CACHE = 'wl-' + VERSION;
 const ASSETS = ['./', 'index.html', 'style.css', 'engine.js', 'app.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'icon-180.png'];
 

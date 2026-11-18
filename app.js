@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const E = window.Engine;
-  const VERSION = '1.3.2';
+  const VERSION = '1.3.3';
   const $app = document.getElementById('app');
 
   let S = E.emptyState();            // synced data: settings, days, deleted, adjustments
@@ -120,6 +120,22 @@
     const m = E.parseTime(i.value);
     i.classList.toggle('bad', m === undefined);
     return m === undefined ? undefined : E.fmtTime(m);
+  }
+  // A time input with -30 / -15 on its left and +15 / +30 on its right. An empty field starts from `fallback()`.
+  function timeStepper(input, fallback) {
+    const step = (d) => el('button', {
+      type: 'button', class: 'btn step', 'aria-label': `${d > 0 ? 'add' : 'subtract'} ${Math.abs(d)} minutes`,
+      onclick: () => {
+        const cur = E.parseTime(input.value);
+        if (cur === undefined) { input.classList.add('bad'); return; }
+        const start = cur != null ? cur : E.parseTime(fallback && fallback());
+        const base = start == null || start === undefined ? 720 : start;
+        input.classList.remove('bad');
+        input.value = E.fmtTime(((base + d) % 1440 + 1440) % 1440);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      },
+    }, (d > 0 ? '+' : '\u2212') + Math.abs(d));
+    return el('div', { class: 'stepper' }, step(-30), step(-15), input, step(15), step(30));
   }
   function durInput(min, placeholder, signed) {
     return el('input', { type: 'text', autocomplete: 'off', placeholder: placeholder || 'h:mm or 1.5', class: 'dur', value: min ? E.hm(min, !!signed) : '' });
@@ -249,8 +265,12 @@
 
     const addBreak = (s, e2) => {
       const row = { s: timeInput(s), e: timeInput(e2) };
-      row.node = el('div', { class: 'row tight', style: 'margin-top:6px' }, row.s, '–', row.e,
-        el('button', { class: 'icon', 'aria-label': 'Remove break', onclick: () => { row.node.remove(); brRows.splice(brRows.indexOf(row), 1); refresh(); } }, '×'));
+      const dflt = (i) => (sch && sch.breaks && sch.breaks[0] && sch.breaks[0][i]) || (i ? '12:30' : '12:00');
+      row.node = el('div', { class: 'brk' },
+        el('div', { class: 'brk-line' }, el('small', { style: 'flex:1;width:auto' }, 'Break'),
+          el('button', { class: 'icon', 'aria-label': 'Remove break', onclick: () => { row.node.remove(); brRows.splice(brRows.indexOf(row), 1); refresh(); } }, '×')),
+        el('div', { class: 'brk-line' }, el('small', {}, 'from'), timeStepper(row.s, () => dflt(0))),
+        el('div', { class: 'brk-line' }, el('small', {}, 'to'), timeStepper(row.e, () => row.s.value || dflt(1))));
       row.node.addEventListener('input', refresh);
       brRows.push(row); brBox.append(row.node);
     };
@@ -270,11 +290,12 @@
       const auto = E.nominalFor(S.settings, date, Object.assign({}, t, { nominalMin: undefined }));
       const nom = t.nominalMin != null ? t.nominalMin : auto;
       nomHint.textContent = `auto: ${E.hm(auto)} (${E.dec(auto)} h)`;
-      prev.replaceChildren(
+      prev.replaceChildren(...[
         el('div', { class: 'kv' }, el('span', {}, 'Worked (incl. extra)'), dual(worked)),
         el('div', { class: 'kv' }, el('span', {}, 'Nominal'), dual(nom)),
         el('div', { class: 'kv strong' }, el('span', {}, 'Difference'), dual(worked - nom, true)),
-        ['comp', 'halfcomp'].includes(t.type) ? el('small', {}, 'Time in lieu: uses this week\'s Überstunden first, then Überzeit.') : null);
+        ['comp', 'halfcomp'].includes(t.type) ? el('small', {}, 'Time in lieu: uses this week\'s Überstunden first, then Überzeit.') : null,
+      ].filter(Boolean));
     }
     typeSel.addEventListener('change', () => {
       const ty = typeSel.value;
@@ -327,7 +348,9 @@
     const body = [
       el('p', { class: 'muted' }, `${E.WEEKDAYS[E.dow(date)]} ${date}`, info.holiday ? ` · ${info.holiday.name}${info.holiday.half ? ' (half day)' : ''}` : ''),
       field('Type', typeSel),
-      el('div', { class: 'row' }, field('IN', inI), field('OUT', outI)),
+      el('div', { class: 'row', style: 'gap:4px 18px' },
+        field('IN', timeStepper(inI, () => sch && sch.in)),
+        field('OUT', timeStepper(outI, () => sch && sch.out))),
       field('Breaks', brBox, el('button', { class: 'btn small', style: 'margin-top:6px', onclick: () => { addBreak('', ''); } }, '+ Add break')),
       field('Extra hours (±, worked outside IN/OUT)', extraI),
       field('Tag', tagSel), field('Note', noteI), field('More info', note2I),
@@ -514,11 +537,10 @@
     const y = +today.slice(0, 4), yr = C.years[y], legal = yr ? yr.legalUzMin : 0;
     const bar = (min, cap) => el('div', { class: 'bar' + (min > cap ? ' over' : '') }, el('i', { style: `width:${Math.min(100, cap ? (min / cap) * 100 : 0)}%` }));
     out.push(el('div', { class: 'card' }, el('h3', {}, `Legal Überzeit ${y} (as per Arbeitsgesetz, Swiss Federal Labour Act [SR 822.11])`),
-      el('p', { class: 'muted', style: 'margin:0 0 6px' }, `Hours worked above ${E.hm(s.legalWeekMin)} per week. Can differ from your Überzeit in the compensation balance.`),
+      el('p', { class: 'muted', style: 'margin:0 0 6px' }, `Hours worked above ${E.hm(s.legalWeekMin)} per week.`),
       kv('Legal Überzeit this year', legal),
       el('small', {}, `Surcharge-free limit ${E.hm(s.legalFreeYearMin)} (${E.dec(s.legalFreeYearMin)} h)`), bar(legal, s.legalFreeYearMin),
-      el('small', {}, `Yearly cap ${E.hm(s.legalCapYearMin)} (${E.dec(s.legalCapYearMin)} h)`), bar(legal, s.legalCapYearMin),
-      kv('Überzeit by your rule, this year', yr ? yr.uzMin : 0, { signed: true })));
+      el('small', {}, `Yearly cap ${E.hm(s.legalCapYearMin)} (${E.dec(s.legalCapYearMin)} h)`), bar(legal, s.legalCapYearMin)));
     const wk = C.weeks[E.weekStart(today)];
     out.push(el('div', { class: 'card' }, el('h3', {}, 'Überstunden (tracking only)'),
       kv('Total since cutoff', t.usMin, { sub: 'covered by contract, never paid' }),
