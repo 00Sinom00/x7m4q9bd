@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const E = window.Engine;
-  const VERSION = '1.3.0';
+  const VERSION = '1.3.1';
   const $app = document.getElementById('app');
 
   let S = E.emptyState();            // synced data: settings, days, deleted, adjustments
@@ -273,11 +273,14 @@
       prev.replaceChildren(
         el('div', { class: 'kv' }, el('span', {}, 'Worked (incl. extra)'), dual(worked)),
         el('div', { class: 'kv' }, el('span', {}, 'Nominal'), dual(nom)),
-        el('div', { class: 'kv strong' }, el('span', {}, 'Difference'), dual(worked - nom, true)));
+        el('div', { class: 'kv strong' }, el('span', {}, 'Difference'), dual(worked - nom, true)),
+        ['comp', 'halfcomp'].includes(t.type) ? el('small', {}, 'Time in lieu: uses this week\'s Überstunden first, then Überzeit.') : null);
     }
     typeSel.addEventListener('change', () => {
       const ty = typeSel.value;
-      if (['work', 'half', 'halfholiday', 'halfcomp'].includes(ty) && !inI.value && !outI.value && sch && sch.in) {
+      if (['comp', 'vacation', 'sick', 'dayoff'].includes(ty)) {   // no work on these days: drop the pre-filled times
+        inI.value = ''; outI.value = ''; brRows.splice(0).forEach((r) => r.node.remove());
+      } else if (['work', 'half', 'halfholiday', 'halfcomp', 'halfvacation'].includes(ty) && !inI.value && !outI.value && sch && sch.in) {
         inI.value = sch.in;
         if (ty === 'work') { outI.value = sch.out || ''; brRows.splice(0).forEach((r) => r.node.remove()); (sch.breaks || []).forEach((b) => addBreak(b[0], b[1])); }
         else { const i = E.parseTime(sch.in); outI.value = E.fmtTime((i + Math.round((sch.nominalMin || 0) / 2)) % 1440); }
