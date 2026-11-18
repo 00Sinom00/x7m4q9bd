@@ -114,4 +114,10 @@ input.bad { border-color: var(--neg); outline: 1px solid var(--neg); }
 .de .row { justify-content: center; }
 .de .stepper { justify-content: center; }
 .de label.f > input[type=text], .de label.f > select { text-align: left; }
+.banner.danger { background: #b3261e; color: #fff; border-left: 6px solid #7f1913; font-weight: 650; }
+.banner.danger small { color: #ffd9d6; font-weight: 400; }
+.banner.danger .btn { background: #fff; color: #b3261e; border-color: #fff; font-weight: 700; }
+.sheet.alert { border-top: 8px solid #b3261e; }
+.sheet.alert .sheet-head h2 { color: var(--neg); font-size: 20px; }
+.alert-big { font-size: 20px; font-weight: 650; margin: 12px 0 4px; }
 

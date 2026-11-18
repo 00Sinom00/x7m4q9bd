@@ -130,7 +130,7 @@
       legalWeekMin: 2700,       // 45 h
       legalFreeYearMin: 3600,   // 60 h
       legalCapYearMin: 10200,   // 170 h
-      backupDays: 7,
+      backupHours: 24,          // warn when the last export is older than this
       holidays: {},             // per-year overrides of the generated calendar
     };
   };

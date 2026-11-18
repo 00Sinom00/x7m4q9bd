@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const E = window.Engine;
-  const VERSION = '1.3.4';
+  const VERSION = '1.4.0';
   const $app = document.getElementById('app');
 
   let S = E.emptyState();            // synced data: settings, days, deleted, adjustments
@@ -86,13 +86,17 @@
     document.body.append(t);
     setTimeout(() => t.remove(), action ? 9000 : 2600);
   }
-  function modal(title, body, buttons) {
-    const close = () => { back.remove(); if (!document.querySelector('.backdrop')) document.body.classList.remove('noscroll'); };
+  function modal(title, body, buttons, cls, onClose) {
+    const close = () => {
+      if (!back.isConnected) return;
+      back.remove(); if (!document.querySelector('.backdrop')) document.body.classList.remove('noscroll');
+      if (onClose) onClose();
+    };
     const foot = el('div', { class: 'sheet-foot' }, buttons.map((b) => el('button', {
       class: 'btn ' + (b.kind || ''),
       onclick: () => { if (b.fn && b.fn() === false) return; close(); },
     }, b.label)));
-    const sheet = el('div', { class: 'sheet', role: 'dialog', 'aria-label': title },
+    const sheet = el('div', { class: 'sheet' + (cls ? ' ' + cls : ''), role: 'dialog', 'aria-label': title },
       el('div', { class: 'sheet-head' }, el('h2', {}, title), el('button', { class: 'icon', 'aria-label': 'Close', onclick: close }, '×')),
       el('div', { class: 'sheet-body' }, body), foot);
     const back = el('div', { class: 'backdrop' }, sheet);
@@ -187,6 +191,11 @@
   }
   function banners(today) {
     const out = [];
+    if (backupOverdue()) {
+      out.push(el('div', { class: 'banner danger' },
+        el('span', {}, el('b', {}, '⚠ Backup overdue'), el('small', { style: 'display:block' }, META.lastExportAt ? `Last backup ${ageText()}` : 'No backup exported yet')),
+        el('button', { class: 'btn small', onclick: () => backupNow() }, 'Back up now')));
+    }
     if (!Object.keys(S.days).length && !S.adjustments.some((a) => !a.deleted)) {
       out.push(el('div', { class: 'banner warn' },
         el('span', {}, el('b', {}, 'Nothing stored on this device yet'),
@@ -197,13 +206,6 @@
     if (pending.length) {
       out.push(el('div', { class: 'banner warn' }, el('span', {}, `${pending.length} day${pending.length > 1 ? 's' : ''} to confirm`),
         el('button', { class: 'btn small', onclick: () => go({ tab: 'week', week: E.weekStart(pending[0]) }) }, 'Show')));
-    }
-    if (Object.keys(S.days).length) {
-      const since = META.lastExportAt ? (Date.now() - new Date(META.lastExportAt).getTime()) / 864e5 : Infinity;
-      if (since > S.settings.backupDays) {
-        out.push(el('div', { class: 'banner warn' }, el('span', {}, META.lastExportAt ? `No backup for ${Math.floor(since)} days` : 'No backup exported yet'),
-          el('button', { class: 'btn small', onclick: () => go({ tab: 'more', more: 'sync' }) }, 'Back up')));
-      }
     }
     return out;
   }
@@ -594,7 +596,7 @@
       vpy: el('input', { type: 'text', inputmode: 'decimal', value: String(s.vacationPerYear) }),
       vsy: el('input', { type: 'text', inputmode: 'numeric', value: String(s.vacationStartYear) }),
       vop: el('input', { type: 'text', inputmode: 'decimal', value: String(s.vacationOpening) }),
-      start: dateInput(s.startDate), bk: el('input', { type: 'text', inputmode: 'numeric', value: String(s.backupDays) }),
+      start: dateInput(s.startDate), bk: el('input', { type: 'text', inputmode: 'numeric', value: String(s.backupHours) }),
       lw: durInput(s.legalWeekMin), lf: durInput(s.legalFreeYearMin), lc: durInput(s.legalCapYearMin),
     };
     const err = el('div', { class: 'err' });
@@ -612,7 +614,7 @@
       if (cut === undefined || st === undefined || [al, dy, lw, lf, lc].includes(undefined) || [vpy, vsy, vop, bk].includes(undefined) || !dy) {
         err.textContent = 'Some values are invalid (highlighted).'; return;
       }
-      Object.assign(s, { schedule, cutoff: cut, startDate: st, freeAllowanceMin: al, dayMin: dy, legalWeekMin: lw, legalFreeYearMin: lf, legalCapYearMin: lc, vacationPerYear: vpy, vacationStartYear: Math.round(vsy), vacationOpening: vop, backupDays: Math.max(1, Math.round(bk)) });
+      Object.assign(s, { schedule, cutoff: cut, startDate: st, freeAllowanceMin: al, dayMin: dy, legalWeekMin: lw, legalFreeYearMin: lf, legalCapYearMin: lc, vacationPerYear: vpy, vacationStartYear: Math.round(vsy), vacationOpening: vop, backupHours: Math.max(1, Math.round(bk)) });
       saveSettings(); err.textContent = ''; toast('Settings saved'); render();
     };
     return [
@@ -628,7 +630,7 @@
         field('Days per year', f.vpy), field('First year counted', f.vsy), field('Days carried in at the first year', f.vop)),
       el('div', { class: 'card' }, el('h3', {}, 'Legal info limits (ArG)'),
         field('Weekly maximum (h:mm)', f.lw), field('Yearly surcharge-free Überzeit', f.lf), field('Yearly Überzeit cap', f.lc)),
-      el('div', { class: 'card' }, el('h3', {}, 'Backup'), field('Remind me after this many days without export', f.bk)),
+      el('div', { class: 'card' }, el('h3', {}, 'Backup'), field('Warn me when the last backup is older than (hours)', f.bk)),
       err,
       el('div', { class: 'btns' }, el('button', { class: 'btn primary', onclick: save }, 'Save settings')),
     ];
@@ -777,6 +779,27 @@
     const views = { week: viewWeek, month: viewMonth, year: viewYear, totals: viewTotals, more: viewMore };
     $app.replaceChildren(...views[UI.tab](C, today).filter(Boolean), tabs(C, today));
     window.scrollTo(0, y);
+    document.title = backupOverdue() ? '⚠ Log' : 'Log';
+  }
+
+  /* ---------- backup watchdog ---------- */
+  const hasData = () => Object.keys(S.days).length > 0 || S.adjustments.some((a) => !a.deleted);
+  const backupAgeH = () => (META.lastExportAt ? (Date.now() - new Date(META.lastExportAt).getTime()) / 36e5 : Infinity);
+  function backupOverdue() { return hasData() && backupAgeH() > S.settings.backupHours; }
+  function ageText() { const h = backupAgeH(); return h < 48 ? `${Math.floor(h)} hours ago` : `${Math.floor(h / 24)} days ago`; }
+  const backupNow = () => doExport(canShareFiles());
+  function snooze(minutes) { META.snoozeUntil = Date.now() + minutes * 60000; persistMeta(); }
+  let watchdogOpen = false;
+  function checkBackup() {
+    if (!backupOverdue() || watchdogOpen || document.hidden || (META.snoozeUntil || 0) > Date.now()) return;
+    watchdogOpen = true;
+    modal('⚠ Backup overdue', [
+      el('p', { class: 'alert-big' }, META.lastExportAt ? `Your last backup is ${ageText()}.` : 'You have never exported a backup.'),
+      el('p', {}, 'Your data lives only in this browser. If the browser clears it, or you work in a private window, it is gone. Save a backup file now.'),
+    ], [
+      { label: 'Remind me in 1 hour', fn: () => { snooze(60); } },
+      { label: 'Back up now', kind: 'primary', fn: () => { snooze(15); backupNow(); } },
+    ], 'alert', () => { watchdogOpen = false; if ((META.snoozeUntil || 0) <= Date.now()) snooze(15); });
   }
 
   /* ---------- boot ---------- */
@@ -789,13 +812,15 @@
       if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
     } catch (e) { /* start empty */ }
     render();
-    document.addEventListener('visibilitychange', () => { if (!document.hidden && !document.querySelector('.backdrop')) render(); });
+    checkBackup();
+    setInterval(checkBackup, 10 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (!document.querySelector('.backdrop')) render(); checkBackup(); } });
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       const had = !!navigator.serviceWorker.controller;
       navigator.serviceWorker.register('sw.js').catch(() => {});
       navigator.serviceWorker.addEventListener('controllerchange', () => { if (had) toast('Updated to a new version', { label: 'Reload', fn: () => location.reload() }); });
     }
   }
-  window.__wl = { get state() { return S; }, render, UI, E, handleFile, doExport };
+  window.__wl = { get state() { return S; }, get META() { return META; }, render, UI, E, handleFile, doExport, checkBackup, backupNow };
   boot();
 })();
